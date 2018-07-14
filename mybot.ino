@@ -156,6 +156,7 @@ void setup() {
 
   XAxis.setCurrentPosition(0);
   YAxis.setCurrentPosition(0);
+  ZAxis.setCurrentPosition(0);
 }
 
 void initialize(void) {
@@ -321,10 +322,10 @@ void homeXAxis(void) {
     //delay(5);
   }
 
-  XAxis.setCurrentPosition(0); 
+  XAxis.setCurrentPosition(0);
   initial_x_homing = 1;
 
-  while (initial_x_homing < 200){
+  while (initial_x_homing < 200) {
     XAxis.moveTo(initial_x_homing);
     XAxis.run();
     initial_x_homing++;
@@ -357,18 +358,26 @@ void gotoInitZPosition(void) {
   ZAxis.setMaxSpeed(5000);
   //ZAxis.setSpeed(500);
   ZAxis.setAcceleration(500);
-  initial_z_homing = 0;
+  //  initial_z_homing = 0;
+  //
+  //
+  //  while (initial_z_homing > -26200) { // Make the Stepper move CW until the switch is deactivated
+  //    ZAxis.moveTo(initial_z_homing);
+  //    ZAxis.run();
+  //    initial_z_homing--;
+  //    //delay(5);
+  //  }
+  //
+  //  Serial.println("Max steps :- ");
+  //  Serial.println(initial_z_homing);
+  //
+  //  ZAxis.setCurrentPosition(0);
 
+  ZAxis.moveTo(-20820);
 
-  while (initial_z_homing > -26200) { // Make the Stepper move CW until the switch is deactivated
-    ZAxis.moveTo(initial_z_homing);
+  while (ZAxis.distanceToGo() != 0) {
     ZAxis.run();
-    initial_z_homing--;
-    //delay(5);
   }
-
-  Serial.println("Max steps :- ");
-  Serial.println(initial_z_homing);
 
   ZAxis.setCurrentPosition(0);
 }
@@ -392,97 +401,120 @@ void loop () {
 
   XAxis.setMaxSpeed(10000.0);
   YAxis.setMaxSpeed(20000.0);
+  ZAxis.setMaxSpeed(5000.0);
+  
   XAxis.setAcceleration(1000.0);
   YAxis.setAcceleration(1000.0);
+  ZAxis.setAcceleration(500.0);
 
   delay(3000);
 
-  YAxis.moveTo(26096);
-  XAxis.moveTo(2029);
+  ZAxis.moveTo(4259);
 
-//  YAxis.moveTo(25086);
-//  XAxis.moveTo(2067);
+  while (ZAxis.distanceToGo() != 0) {
+    ZAxis.run();
+  }
 
-//  YAxis.moveTo(24106);
-//  XAxis.moveTo(2154);
-
-//  YAxis.moveTo(23150);
-//  XAxis.moveTo(2288);
-
-//  YAxis.moveTo(22218);
-//  XAxis.moveTo(2464);
-
-//  YAxis.moveTo(21307);
-//  XAxis.moveTo(2681);
-
-//====================================
+  delay(3000);
   
-//  YAxis.moveTo(26126);
-//  XAxis.moveTo(2000);
+  //================ Based on R and D values ====================
 
-//  YAxis.moveTo(25116); 
-//  XAxis.moveTo(2048);
+  //  YAxis.moveTo(26096);
+  //  XAxis.moveTo(2029);
 
-//  YAxis.moveTo(24106);
-//  XAxis.moveTo(2096);
+  //  YAxis.moveTo(25086);
+  //  XAxis.moveTo(2067);
 
-//  YAxis.moveTo(23096);
-//  XAxis.moveTo(2192);
-  
+  //  YAxis.moveTo(24106);
+  //  XAxis.moveTo(2154);
+
+  //  YAxis.moveTo(23150);
+  //  XAxis.moveTo(2288);
+
+  //  YAxis.moveTo(22218);
+  //  XAxis.moveTo(2464);
+
+  //  YAxis.moveTo(21307);
+  //  XAxis.moveTo(2681);
+
+  //================ Based on realy step calculation ===================
+
+  YAxis.moveTo(26181);
+  XAxis.moveTo(2095);
+
+  //  YAxis.moveTo(25168);
+  //  XAxis.moveTo(2135);
+
+  //  YAxis.moveTo(24184);
+  //  XAxis.moveTo(2225);
+
+  //  YAxis.moveTo(23226);
+  //  XAxis.moveTo(2363);
+
+  //  YAxis.moveTo(22291);
+  //  XAxis.moveTo(2545);
+
+  //  YAxis.moveTo(21377);
+  //  XAxis.moveTo(2769);
+
   while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
     YAxis.run();
     XAxis.run();
   }
 
-/**
-
-  XAxis.setMaxSpeed(10000.0);
-  YAxis.setMaxSpeed(20000.0);
-  XAxis.setAcceleration(1000.0);
-  YAxis.setAcceleration(1000.0);
-
-  delay(3000);
-
-  XAxis.setCurrentPosition(0);
-  YAxis.setCurrentPosition(0);
-
-  YAxis.moveTo(26126);
-  XAxis.moveTo(2000);
-
-  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
-    YAxis.run();
-    XAxis.run();
-  }
-
-  delay(1000);
-
-  if (isMagnetOn == 1) {
-    digitalWrite(HEATER_0_PIN    , LOW);
-    isMagnetOn = 0;
-  } else {
-    digitalWrite(HEATER_0_PIN    , HIGH);
-    isMagnetOn = 1;
-  }
 
 
-  if (YAxis.distanceToGo() == 0) {
-    YAxis.setCurrentPosition(0);
-    YAxis.moveTo(-26125);
-  }
 
-  if (XAxis.distanceToGo() == 0) {
+  
+  /**
+
+    XAxis.setMaxSpeed(10000.0);
+    YAxis.setMaxSpeed(20000.0);
+    XAxis.setAcceleration(1000.0);
+    YAxis.setAcceleration(1000.0);
+
+    delay(3000);
+
     XAxis.setCurrentPosition(0);
-    XAxis.moveTo(-1999);
-  }
+    YAxis.setCurrentPosition(0);
 
-  delay(1000);
+    YAxis.moveTo(26126);
+    XAxis.moveTo(2000);
 
-  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
-    YAxis.run();
-    XAxis.run();
-  }
+    while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+      YAxis.run();
+      XAxis.run();
+    }
 
-**/  
+    delay(1000);
+
+    if (isMagnetOn == 1) {
+      digitalWrite(HEATER_0_PIN    , LOW);
+      isMagnetOn = 0;
+    } else {
+      digitalWrite(HEATER_0_PIN    , HIGH);
+      isMagnetOn = 1;
+    }
+
+
+    if (YAxis.distanceToGo() == 0) {
+      YAxis.setCurrentPosition(0);
+      YAxis.moveTo(-26125);
+    }
+
+    if (XAxis.distanceToGo() == 0) {
+      XAxis.setCurrentPosition(0);
+      XAxis.moveTo(-1999);
+    }
+
+    delay(1000);
+
+    while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+      YAxis.run();
+      XAxis.run();
+    }
+
+  **/
 }
 
 
