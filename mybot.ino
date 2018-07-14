@@ -387,6 +387,7 @@ void draw(void) {
 
 void loop () {
 
+/**
   XAxis.setMaxSpeed(10000.0);
   YAxis.setMaxSpeed(20000.0);
   XAxis.setAcceleration(1000.0);
@@ -404,7 +405,53 @@ void loop () {
     YAxis.run();
 //    XAxis.run();
   }
+**/
 
+  XAxis.setMaxSpeed(10000.0);
+  YAxis.setMaxSpeed(20000.0);
+  XAxis.setAcceleration(1000.0);
+  YAxis.setAcceleration(1000.0);
+
+  delay(3000);
+
+  XAxis.setCurrentPosition(0);
+  YAxis.setCurrentPosition(0);
+
+  YAxis.moveTo(24320);
+  XAxis.moveTo(2000);
+
+  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+    YAxis.run();
+    XAxis.run();
+  }
+
+  delay(1000);
+
+  if (isMagnetOn == 1) {
+    digitalWrite(HEATER_0_PIN    , LOW);
+    isMagnetOn = 0;
+  } else {
+    digitalWrite(HEATER_0_PIN    , HIGH);
+    isMagnetOn = 1;
+  }
+
+
+  if (YAxis.distanceToGo() == 0) {
+    YAxis.setCurrentPosition(0);
+    YAxis.moveTo(-24319);
+  }
+
+  if (XAxis.distanceToGo() == 0) {
+    XAxis.setCurrentPosition(0);
+    XAxis.moveTo(-1999);
+  }
+
+  delay(1000);
+
+  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+    YAxis.run();
+    XAxis.run();
+  }
 }
 
 
