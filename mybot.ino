@@ -150,10 +150,12 @@ void setup() {
   homeXAxis();
   homeZAxis();
 
-  gotoInitYPosition();
-  homeXAxis();
+  //gotoInitYPosition();
+  //homeXAxis();
   gotoInitZPosition();
 
+  XAxis.setCurrentPosition(0);
+  YAxis.setCurrentPosition(0);
 }
 
 void initialize(void) {
@@ -352,13 +354,13 @@ void gotoInitYPosition(void) {
 
 void gotoInitZPosition(void) {
   ZAxis.setCurrentPosition(0);  // Set the current position as zero for now
-  ZAxis.setMaxSpeed(1000);
+  ZAxis.setMaxSpeed(5000);
   //ZAxis.setSpeed(500);
-  ZAxis.setAcceleration(100);
+  ZAxis.setAcceleration(500);
   initial_z_homing = 0;
 
 
-  while (initial_z_homing > -106000) { // Make the Stepper move CW until the switch is deactivated
+  while (initial_z_homing > -26200) { // Make the Stepper move CW until the switch is deactivated
     ZAxis.moveTo(initial_z_homing);
     ZAxis.run();
     initial_z_homing--;
@@ -387,25 +389,52 @@ void draw(void) {
 
 void loop () {
 
-/**
+
   XAxis.setMaxSpeed(10000.0);
   YAxis.setMaxSpeed(20000.0);
   XAxis.setAcceleration(1000.0);
-  YAxis.setAcceleration(2000.0);
+  YAxis.setAcceleration(1000.0);
 
   delay(3000);
 
-//  XAxis.setCurrentPosition(0);
-//  YAxis.setCurrentPosition(0);
+  YAxis.moveTo(26096);
+  XAxis.moveTo(2029);
 
-  YAxis.moveTo(23666);
-//  XAxis.moveTo(7500);
+//  YAxis.moveTo(25086);
+//  XAxis.moveTo(2067);
 
+//  YAxis.moveTo(24106);
+//  XAxis.moveTo(2154);
+
+//  YAxis.moveTo(23150);
+//  XAxis.moveTo(2288);
+
+//  YAxis.moveTo(22218);
+//  XAxis.moveTo(2464);
+
+//  YAxis.moveTo(21307);
+//  XAxis.moveTo(2681);
+
+//====================================
+  
+//  YAxis.moveTo(26126);
+//  XAxis.moveTo(2000);
+
+//  YAxis.moveTo(25116); 
+//  XAxis.moveTo(2048);
+
+//  YAxis.moveTo(24106);
+//  XAxis.moveTo(2096);
+
+//  YAxis.moveTo(23096);
+//  XAxis.moveTo(2192);
+  
   while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
     YAxis.run();
-//    XAxis.run();
+    XAxis.run();
   }
-**/
+
+/**
 
   XAxis.setMaxSpeed(10000.0);
   YAxis.setMaxSpeed(20000.0);
@@ -417,7 +446,7 @@ void loop () {
   XAxis.setCurrentPosition(0);
   YAxis.setCurrentPosition(0);
 
-  YAxis.moveTo(24320);
+  YAxis.moveTo(26126);
   XAxis.moveTo(2000);
 
   while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
@@ -438,7 +467,7 @@ void loop () {
 
   if (YAxis.distanceToGo() == 0) {
     YAxis.setCurrentPosition(0);
-    YAxis.moveTo(-24319);
+    YAxis.moveTo(-26125);
   }
 
   if (XAxis.distanceToGo() == 0) {
@@ -452,6 +481,8 @@ void loop () {
     YAxis.run();
     XAxis.run();
   }
+
+**/  
 }
 
 
