@@ -386,7 +386,25 @@ void draw(void) {
 }
 
 void loop () {
-  
+
+  XAxis.setMaxSpeed(10000.0);
+  YAxis.setMaxSpeed(20000.0);
+  XAxis.setAcceleration(1000.0);
+  YAxis.setAcceleration(2000.0);
+
+  delay(3000);
+
+//  XAxis.setCurrentPosition(0);
+//  YAxis.setCurrentPosition(0);
+
+  YAxis.moveTo(23666);
+//  XAxis.moveTo(7500);
+
+  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+    YAxis.run();
+//    XAxis.run();
+  }
+
 }
 
 
