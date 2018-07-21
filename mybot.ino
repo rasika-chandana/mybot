@@ -66,6 +66,9 @@ long direction = 10000;
 long distanceToGo = 0;
 
 int isMagnetOn = 0;
+int** movesArray = NULL;
+int numberOfMoves = 0;
+int currentMove = -1;
 
 void setup() {
   // flip screen, if required
@@ -157,6 +160,16 @@ void setup() {
   XAxis.setCurrentPosition(0);
   YAxis.setCurrentPosition(0);
   ZAxis.setCurrentPosition(0);
+
+  XAxis.setMaxSpeed(10000.0);
+  YAxis.setMaxSpeed(20000.0);
+  ZAxis.setMaxSpeed(5000.0);
+
+  XAxis.setAcceleration(1000.0);
+  YAxis.setAcceleration(1000.0);
+  ZAxis.setAcceleration(500.0);
+
+  hanoiNoOfMoves();
 }
 
 void initialize(void) {
@@ -398,25 +411,41 @@ void draw(void) {
 
 void loop () {
 
+  /**
+    delay(3000);
 
-  XAxis.setMaxSpeed(10000.0);
-  YAxis.setMaxSpeed(20000.0);
-  ZAxis.setMaxSpeed(5000.0);
-  
-  XAxis.setAcceleration(1000.0);
-  YAxis.setAcceleration(1000.0);
-  ZAxis.setAcceleration(500.0);
+    ZAxis.moveTo(4259);
 
-  delay(3000);
+    while (ZAxis.distanceToGo() != 0) {
+      ZAxis.run();
+    }
+    ZAxis.setCurrentPosition(0);
 
-  ZAxis.moveTo(4259);
+    delay(3000);
 
-  while (ZAxis.distanceToGo() != 0) {
-    ZAxis.run();
-  }
 
-  delay(3000);
-  
+    ZAxis.moveTo(-8518);
+
+    while (ZAxis.distanceToGo() != 0) {
+      ZAxis.run();
+    }
+    ZAxis.setCurrentPosition(0);
+
+    delay(3000);
+
+
+
+    ZAxis.moveTo(4259);
+
+    while (ZAxis.distanceToGo() != 0) {
+      ZAxis.run();
+    }
+    ZAxis.setCurrentPosition(0);
+
+    delay(3000);
+  **/
+
+
   //================ Based on R and D values ====================
 
   //  YAxis.moveTo(26096);
@@ -465,7 +494,7 @@ void loop () {
 
 
 
-  
+
   /**
 
     XAxis.setMaxSpeed(10000.0);
@@ -517,6 +546,66 @@ void loop () {
   **/
 }
 
+
+void hanoiNoOfMoves(void) {
+  int numberOfPlates = 6;
+  numberOfMoves = pow(2, numberOfPlates) - 1;
+
+  if (movesArray != NULL) {
+    movesArray = (int**) realloc(movesArray, numberOfMoves * sizeof(int));
+  } else {
+    movesArray = (int**) malloc(numberOfMoves * sizeof(int));
+  }
+
+  for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
+  {
+    movesArray[iRow] = (int *)malloc(3 * sizeof(int));
+  }
+
+  //  for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
+  //  {
+  //    for (int iCol = 0 ; iCol < 3 ; iCol++)
+  //    {
+  //      movesArray[iRow][iCol] = 3;
+  //    }
+  //  }
+
+  Serial.println("Hanoi :- ");
+  Serial.println(numberOfPlates);
+
+  currentMove = -1;
+  towerOfHanoi(numberOfPlates, 0, 1, 2);
+
+  for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
+  {
+    Serial.println(" ");
+    Serial.print( movesArray[iRow][0]);Serial.print( movesArray[iRow][1]);Serial.print( movesArray[iRow][2]);
+  }
+}
+
+// C recursive function to solve tower of hanoi puzzle
+void towerOfHanoi(int diskNumber, int from_rod, int to_rod, int aux_rod)
+{
+  Serial.println(" ");
+  if (diskNumber == 1)
+  {
+    currentMove ++;
+    movesArray[currentMove][0] = 1;
+    movesArray[currentMove][1] = from_rod;
+    movesArray[currentMove][2] = to_rod;
+    Serial.print("Move disk 1 from rod "); Serial.print(from_rod); Serial.print(" to rod "); Serial.print(to_rod);
+    return;
+  }
+  towerOfHanoi(diskNumber - 1, from_rod, aux_rod, to_rod);
+
+  currentMove ++;
+  movesArray[currentMove][0] = diskNumber;
+  movesArray[currentMove][1] = from_rod;
+  movesArray[currentMove][2] = to_rod;
+  Serial.println(" ");
+  Serial.print("Move disk "); Serial.print(diskNumber); Serial.print(" from rod "); Serial.print(from_rod); Serial.print(" to rod "); Serial.print(to_rod);
+  towerOfHanoi(diskNumber - 1, aux_rod, to_rod, from_rod);
+}
 
 
 
