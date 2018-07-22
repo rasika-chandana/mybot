@@ -2,6 +2,7 @@
 
 #include <AccelStepper.h>
 #include <MultiStepper.h>
+#include <math.h>
 #include "U8glib.h"
 
 
@@ -42,10 +43,22 @@
 
 #define HEATER_0_PIN       10
 #define HEATER_1_PIN       8
-#define TEMP_0_PIN          13
-#define TEMP_1_PIN          14
-#define zPlus             40
-#define zMinus            42
+#define TEMP_0_PIN         13
+#define TEMP_1_PIN         14
+#define zPlus              40
+#define zMinus             42
+
+static const int  BACK_ARM_LENGTH  =  280;
+static const int  FORE_ARM_LENGTH  =  240;
+
+static const long MICRO_STEPS_PER_ROUND = 6400;
+static const long X_MOTOR_STEPS = 89600;
+static const long Y_MOTOR_STEPS = 121600;
+static const double Z_MOTOR_STEPS = 51109.33;
+
+static const double X_INIT_ANGLE = 24.1;
+static const double Y_INIT_ANGLE = 11.8;
+
 
 U8GLIB_ST7920_128X64_1X u8g(23, 17, 16);  // SPI Com: SCK = en = 18, MOSI = rw = 16, CS = di = 17
 
@@ -65,10 +78,28 @@ long initial_x_homing = -1; // Used to Home Stepper at startup
 long direction = 10000;
 long distanceToGo = 0;
 
-int isMagnetOn = 0;
+int numberOfPlates = 2;
+
 int** movesArray = NULL;
 int numberOfMoves = 0;
 int currentMove = -1;
+int currentTowerStatus[] = {0, 0, 0};
+
+boolean isPlatesReady = true;
+boolean isMoveComplete = true;
+
+int plateHieght = 15;
+int plateFreeMoveGap = 5;
+int baseX = 409;
+int baseY = -216;
+
+int isMagnetOn = 0;
+
+long currentYsteps = 0;
+long currentXsteps = 0;
+
+long nextYsteps = 0;
+long nextXsteps = 0;
 
 void setup() {
   // flip screen, if required
@@ -170,6 +201,7 @@ void setup() {
   ZAxis.setAcceleration(500.0);
 
   hanoiNoOfMoves();
+  goToStartPoint();
 }
 
 void initialize(void) {
@@ -395,6 +427,33 @@ void gotoInitZPosition(void) {
   ZAxis.setCurrentPosition(0);
 }
 
+void goToStartPoint(void) {
+  ZAxis.moveTo(-(stepsZ(23)));
+
+  while (ZAxis.distanceToGo() != 0) {
+    ZAxis.run();
+  }
+
+  ZAxis.setCurrentPosition(0);
+
+  long initY = baseY + (numberOfPlates * plateHieght) + plateFreeMoveGap;
+  long initX = 409;
+
+  stepsXandY(initX, initY);
+
+  YAxis.moveTo(nextYsteps);
+  XAxis.moveTo(nextXsteps);
+
+  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+    YAxis.run();
+    XAxis.run();
+  }
+
+  currentMove = -1;
+  currentTowerStatus[0] = numberOfPlates;
+}
+
+
 void draw(void) {
   // graphic commands to redraw the complete screen should be placed here
   u8g.setFont(u8g_font_courR08);
@@ -411,6 +470,26 @@ void draw(void) {
 
 void loop () {
 
+  if (isPlatesReady && (currentMove < numberOfMoves)) {
+    if (isMoveComplete) {
+      currentMove++;
+      int fromTower = movesArray[currentMove][1];
+      int toTower = movesArray[currentMove][2];
+      int currentTower = 0;
+      if (currentMove > 0) {
+        currentTower = movesArray[currentMove - 1][2];
+      }
+    }
+
+    if (isPickUpMove) {
+
+    }
+
+    if (isDropMove) {
+
+    }
+
+  }
   /**
     delay(3000);
 
@@ -468,11 +547,11 @@ void loop () {
 
   //================ Based on realy step calculation ===================
 
-  YAxis.moveTo(26181);
-  XAxis.moveTo(2095);
+  //  YAxis.moveTo(26181);
+  //  XAxis.moveTo(2095);
 
-  //  YAxis.moveTo(25168);
-  //  XAxis.moveTo(2135);
+  //    YAxis.moveTo(25168);
+  //    XAxis.moveTo(2135);
 
   //  YAxis.moveTo(24184);
   //  XAxis.moveTo(2225);
@@ -486,10 +565,30 @@ void loop () {
   //  YAxis.moveTo(21377);
   //  XAxis.moveTo(2769);
 
-  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
-    YAxis.run();
-    XAxis.run();
-  }
+  //================ Based on realy step calculation ===================
+
+  //  YAxis.moveTo(26181);
+  //  XAxis.moveTo(2095);
+
+  //  YAxis.moveTo(25243);
+  //  XAxis.moveTo(2119);
+
+  //  YAxis.moveTo(24184);
+  //  XAxis.moveTo(2225);
+
+  //  YAxis.moveTo(23226);
+  //  XAxis.moveTo(2363);
+
+  //  YAxis.moveTo(22291);
+  //  XAxis.moveTo(2545);
+
+  //  YAxis.moveTo(21377);
+  //  XAxis.moveTo(2769);
+
+  //  while (YAxis.distanceToGo() != 0 || XAxis.distanceToGo() != 0) {
+  //    YAxis.run();
+  //    XAxis.run();
+  //  }
 
 
 
@@ -548,7 +647,7 @@ void loop () {
 
 
 void hanoiNoOfMoves(void) {
-  int numberOfPlates = 6;
+
   numberOfMoves = pow(2, numberOfPlates) - 1;
 
   if (movesArray != NULL) {
@@ -562,14 +661,6 @@ void hanoiNoOfMoves(void) {
     movesArray[iRow] = (int *)malloc(3 * sizeof(int));
   }
 
-  //  for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
-  //  {
-  //    for (int iCol = 0 ; iCol < 3 ; iCol++)
-  //    {
-  //      movesArray[iRow][iCol] = 3;
-  //    }
-  //  }
-
   Serial.println("Hanoi :- ");
   Serial.println(numberOfPlates);
 
@@ -579,11 +670,10 @@ void hanoiNoOfMoves(void) {
   for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
   {
     Serial.println(" ");
-    Serial.print( movesArray[iRow][0]);Serial.print( movesArray[iRow][1]);Serial.print( movesArray[iRow][2]);
+    Serial.print( movesArray[iRow][0]); Serial.print( movesArray[iRow][1]); Serial.print( movesArray[iRow][2]);
   }
 }
 
-// C recursive function to solve tower of hanoi puzzle
 void towerOfHanoi(int diskNumber, int from_rod, int to_rod, int aux_rod)
 {
   Serial.println(" ");
@@ -607,12 +697,57 @@ void towerOfHanoi(int diskNumber, int from_rod, int to_rod, int aux_rod)
   towerOfHanoi(diskNumber - 1, aux_rod, to_rod, from_rod);
 }
 
+double lawOfCosines(double a, double b, double c) {
+  return acos((a * a + b * b - c * c) / (2 * a * b));
+}
 
+double distance(double x, double y) {
+  return sqrt(x * x + y * y);
+}
 
+double deg(double rad) {
+  return rad * 180 / PI;
+}
 
+void stepsXandY(double x, double y) {
+  double dist = distance(x, y);
+  double D1 = atan2(y, x);
 
+  double D2 = lawOfCosines(dist, BACK_ARM_LENGTH, FORE_ARM_LENGTH);
 
+  double A1 = D1 + D2;
 
+  double A2 = lawOfCosines(BACK_ARM_LENGTH, FORE_ARM_LENGTH, dist);
+
+  double backArmAngle = (90 - deg(A1));
+  double foreArmAngle = (deg(A2) - backArmAngle);
+
+  double backArmMoveAngle = backArmAngle - Y_INIT_ANGLE;
+  double foreArmMoveAngle = foreArmAngle - X_INIT_ANGLE;
+
+  double backArmSteps = Y_MOTOR_STEPS / 360 * backArmMoveAngle;
+  double foreArmSteps = X_MOTOR_STEPS / 360 * foreArmMoveAngle;
+
+  currentYsteps = nextYsteps;
+  nextYsteps = round (backArmSteps);
+
+  currentXsteps = nextXsteps;
+  nextXsteps = round (foreArmSteps);
+
+  Serial.println(" ");
+  Serial.print("A1 rad : "); Serial.print(A1); Serial.print("  A1 deg : "); Serial.print(backArmAngle); Serial.print("  Y move angle : "); Serial.print(backArmMoveAngle);
+  Serial.print("  Y steps : "); Serial.print(backArmSteps);
+  Serial.println(" ");
+  Serial.print("A2 rad : "); Serial.print(A2); Serial.print("  A2 deg : "); Serial.print(foreArmAngle); Serial.print("  X move angle : "); Serial.print(foreArmMoveAngle);
+  Serial.print("  X steps : "); Serial.print(foreArmSteps);
+}
+
+long stepsZ(double zAxixAngle) {
+  long zSteps = round(Z_MOTOR_STEPS / 360 * zAxixAngle);
+  Serial.println(" ");
+  Serial.print("Z steps : "); Serial.print(zSteps);
+  return zSteps;
+}
 
 
 
