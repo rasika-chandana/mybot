@@ -4,6 +4,7 @@
 #include <MultiStepper.h>
 #include <math.h>
 #include "U8glib.h"
+#include <QueueArray.h>
 
 
 #define X_STEP_PIN         54
@@ -86,12 +87,14 @@ int currentMove = -1;
 int currentTowerStatus[] = {0, 0, 0};
 
 boolean isPlatesReady = true;
-boolean isMoveComplete = true;
+boolean isReadyForNextMove = true;
+boolean isCurrentInstructionComplete = true;
 
 int plateHieght = 15;
 int plateFreeMoveGap = 5;
 int baseX = 409;
 int baseY = -216;
+double baseZAngle = 23;
 
 int isMagnetOn = 0;
 
@@ -100,6 +103,20 @@ long currentXsteps = 0;
 
 long nextYsteps = 0;
 long nextXsteps = 0;
+
+static const int INST_TYPE_UP_AND_DOWN = 0;
+static const int INST_TYPE_UP_ROTATE = 1;
+static const int INST_TYPE_UP_MAGNET = 2;
+
+typedef struct {
+  int      type;
+  long     x;
+  long     y;
+  long     z;
+  boolean  magnetStatus;
+} Instruction;
+
+QueueArray <Instruction> queue;
 
 void setup() {
   // flip screen, if required
@@ -165,7 +182,6 @@ void setup() {
   digitalWrite(HEATER_0_PIN    , LOW);
 
   XAxis.setMaxSpeed(500);
-  //XAxis.setSpeed(100);
   XAxis.setAcceleration(100);
 
   YAxis.setMaxSpeed(500);
@@ -428,7 +444,7 @@ void gotoInitZPosition(void) {
 }
 
 void goToStartPoint(void) {
-  ZAxis.moveTo(-(stepsZ(23)));
+  ZAxis.moveTo(-(stepsZ(baseZAngle)));
 
   while (ZAxis.distanceToGo() != 0) {
     ZAxis.run();
@@ -449,6 +465,9 @@ void goToStartPoint(void) {
     XAxis.run();
   }
 
+  XAxis.setCurrentPosition(0);
+  YAxis.setCurrentPosition(0);
+
   currentMove = -1;
   currentTowerStatus[0] = numberOfPlates;
 }
@@ -468,28 +487,181 @@ void draw(void) {
 
 }
 
+long getDeltaXsteps() {
+  return nextXsteps - currentXsteps;
+}
+
+long getDeltaYsteps() {
+  return nextYsteps - currentYsteps;
+}
+
+void addUpAndDownInstruction(double nextTowerX, double nextTowerY) {
+  stepsXandY(nextTowerX, nextTowerY);
+
+  Instruction instruction = { INST_TYPE_UP_AND_DOWN, getDeltaXsteps(), getDeltaYsteps(), 0, false };
+  queue.enqueue (instruction);
+}
+
+void addLeftRightInstruction(long zSteps) {
+  Instruction instruction = { INST_TYPE_UP_ROTATE, 0, 0, zSteps, false };
+  queue.enqueue (instruction);
+}
+
+void addMagnetInstruction(boolean magnetStatus) {
+  Instruction instruction = { INST_TYPE_UP_MAGNET, 0, 0, 0, magnetStatus };
+  queue.enqueue (instruction);
+}
+
+
+void subMoveStepCommon(int fromTower, int toTower) {
+  int towerDiff = toTower - fromTower;
+
+  if (towerDiff < 0) {
+    if (towerDiff == -1) {
+      double highestTowerY =  baseY + plateFreeMoveGap + (currentTowerStatus[fromTower - 1] * plateHieght);
+      double toTowerX = baseX / cos(rad(baseZAngle));
+      addUpAndDownInstruction(toTowerX, highestTowerY);
+
+      long zSteps = -(stepsZ(baseZAngle));
+      addLeftRightInstruction(zSteps);
+      // up plate hieght
+      // move to right (-)  * 23
+    } else {
+      double highestTowerY =  baseY + plateFreeMoveGap + ((currentTowerStatus[fromTower - 1] > currentTowerStatus[fromTower - 2]) ? (currentTowerStatus[fromTower - 1] * plateHieght) : (currentTowerStatus[fromTower - 2] * plateHieght));
+      double toTowerX = baseX / cos(rad(baseZAngle));
+      addUpAndDownInstruction(toTowerX, highestTowerY);
+
+      long zSteps = -(stepsZ(baseZAngle * 2));
+      addLeftRightInstruction(zSteps);
+      // up plate hieght
+      // move to right (-)  * 23 * 2
+    }
+  } else if (towerDiff > 0) {
+    if (towerDiff == 1) {
+      double highestTowerY =  baseY + plateFreeMoveGap + (currentTowerStatus[fromTower + 1] * plateHieght);
+      double toTowerX = baseX / cos(rad(baseZAngle));
+      addUpAndDownInstruction(toTowerX, highestTowerY);
+
+      long zSteps = stepsZ(baseZAngle);
+      addLeftRightInstruction(zSteps);
+      // up plate hieght
+      // move to left  * 23
+    } else {
+      double highestTowerY =  baseY + plateFreeMoveGap + ((currentTowerStatus[fromTower + 1] > currentTowerStatus[fromTower + 2]) ? (currentTowerStatus[fromTower + 1] * plateHieght) : (currentTowerStatus[fromTower + 2] * plateHieght));
+      double toTowerX = baseX / cos(rad(baseZAngle));
+      addUpAndDownInstruction(toTowerX, highestTowerY);
+
+      long zSteps = stepsZ(baseZAngle * 2);
+      addLeftRightInstruction(zSteps);
+      // up plate hieght
+      // move to left  * 23 * 2
+    }
+  }
+}
+
+void subMoveStep_2(int fromTower, int toTower) {
+  double fromTowerX = baseX;
+  double fromTowerY = baseY + (currentTowerStatus[fromTower] * plateHieght);
+
+  addUpAndDownInstruction(fromTowerX, fromTowerY);
+  addMagnetInstruction(true);
+
+  subMoveStepCommon( fromTower,  toTower);
+
+  fromTowerX = baseX;
+  fromTowerY = baseY + (currentTowerStatus[toTower] * plateHieght);
+  addUpAndDownInstruction(fromTowerX, fromTowerY);
+  addMagnetInstruction(false);
+}
+
+
 void loop () {
 
   if (isPlatesReady && (currentMove < numberOfMoves)) {
-    if (isMoveComplete) {
+    if (isReadyForNextMove) {
       currentMove++;
+
+      Serial.println("Current Move: ");
+      Serial.print("A1 rad : "); Serial.print(currentMove);
+
       int fromTower = movesArray[currentMove][1];
       int toTower = movesArray[currentMove][2];
       int currentTower = 0;
-      if (currentMove > 0) {
-        currentTower = movesArray[currentMove - 1][2];
+//      if (currentMove > 0) {
+//        currentTower = movesArray[currentMove - 1][2];
+//      }
+
+      if (currentTower == fromTower) {
+        subMoveStep_2(fromTower, toTower);
+        currentTower = toTower;
+      } else {
+        subMoveStepCommon(currentTower, fromTower);
+        currentTower = fromTower;
+        subMoveStep_2(fromTower, toTower);
+        currentTower = toTower;
       }
+
+      isReadyForNextMove = false;
     }
 
-    if (isPickUpMove) {
+    Instruction instruction;
 
+    if (!queue.isEmpty () && isCurrentInstructionComplete) {
+      instruction = queue.dequeue ();
+
+      if (instruction.type == INST_TYPE_UP_AND_DOWN) {
+        Serial.println("Current Instruction : UP_AND_DOWN"); Serial.print(" X "); Serial.print(instruction.x); Serial.print(" Y"); Serial.print(instruction.y);
+        isCurrentInstructionComplete = false;
+      } else if (instruction.type == INST_TYPE_UP_ROTATE) {
+        Serial.println("Current Instruction : ROTATE");Serial.print(" Z "); Serial.print(instruction.z);
+        isCurrentInstructionComplete = false;
+      } else if (instruction.type == INST_TYPE_UP_MAGNET) {
+        Serial.println("Current Instruction : MAGNET");
+        if (instruction.magnetStatus) {
+          digitalWrite(HEATER_0_PIN, HIGH);
+
+        } else {
+          digitalWrite(HEATER_0_PIN    , LOW);
+        }
+        isCurrentInstructionComplete = true;
+      }
+    } else {
+      isReadyForNextMove = true;
     }
 
-    if (isDropMove) {
-
+    if (YAxis.distanceToGo() != 0) {
+      YAxis.run();
     }
 
+    if (XAxis.distanceToGo() != 0) {
+      XAxis.run();
+    }
+
+    if (YAxis.distanceToGo() == 0 && XAxis.distanceToGo() == 0 && instruction.type == INST_TYPE_UP_AND_DOWN) {
+      isCurrentInstructionComplete = true;
+      XAxis.setCurrentPosition(0);
+      YAxis.setCurrentPosition(0);
+    }
+
+    if (ZAxis.distanceToGo() != 0) {
+      ZAxis.run();
+    }
+
+    if (ZAxis.distanceToGo() == 0 && instruction.type == INST_TYPE_UP_ROTATE) {
+      isCurrentInstructionComplete = true;
+      ZAxis.setCurrentPosition(0);
+    }
+
+
+    // add robot movements here with above queue
+
+  } else {
+    Serial.println("FINISHED!");
+    // todo call init procedure
   }
+
+  // add input read for display as well
+
   /**
     delay(3000);
 
@@ -550,8 +722,8 @@ void loop () {
   //  YAxis.moveTo(26181);
   //  XAxis.moveTo(2095);
 
-  //    YAxis.moveTo(25168);
-  //    XAxis.moveTo(2135);
+  //  YAxis.moveTo(25168);
+  //  XAxis.moveTo(2135);
 
   //  YAxis.moveTo(24184);
   //  XAxis.moveTo(2225);
@@ -658,7 +830,7 @@ void hanoiNoOfMoves(void) {
 
   for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
   {
-    movesArray[iRow] = (int *)malloc(3 * sizeof(int));
+    movesArray[iRow] = (int *) malloc(3 * sizeof(int));
   }
 
   Serial.println("Hanoi :- ");
@@ -707,6 +879,10 @@ double distance(double x, double y) {
 
 double deg(double rad) {
   return rad * 180 / PI;
+}
+
+double rad(double deg) {
+  return deg *  PI / 180;
 }
 
 void stepsXandY(double x, double y) {
