@@ -85,6 +85,8 @@ int** movesArray = NULL;
 int numberOfMoves = 0;
 int currentMove = -1;
 int currentTowerStatus[] = {0, 0, 0};
+int currentTower = 0;
+int currentInstructionType = 0;
 
 boolean isPlatesReady = true;
 boolean isReadyForNextMove = true;
@@ -104,9 +106,9 @@ long currentXsteps = 0;
 long nextYsteps = 0;
 long nextXsteps = 0;
 
-static const int INST_TYPE_UP_AND_DOWN = 0;
-static const int INST_TYPE_UP_ROTATE = 1;
-static const int INST_TYPE_UP_MAGNET = 2;
+static const int INST_TYPE_UP_AND_DOWN = 1;
+static const int INST_TYPE_UP_ROTATE = 2;
+static const int INST_TYPE_UP_MAGNET = 3;
 
 typedef struct {
   int      type;
@@ -452,8 +454,12 @@ void goToStartPoint(void) {
 
   ZAxis.setCurrentPosition(0);
 
-  long initY = baseY + (numberOfPlates * plateHieght) + plateFreeMoveGap;
-  long initX = 409;
+  ZAxis.setMaxSpeed(10000);
+  ZAxis.setAcceleration(500.0);
+
+  double initY = baseY + (numberOfPlates * plateHieght) + plateFreeMoveGap;
+  //  double initX = baseX / cos(rad(baseZAngle));
+  double initX = baseX;
 
   stepsXandY(initX, initY);
 
@@ -488,11 +494,11 @@ void draw(void) {
 }
 
 long getDeltaXsteps() {
-  return nextXsteps - currentXsteps;
+  return currentXsteps - nextXsteps;
 }
 
 long getDeltaYsteps() {
-  return nextYsteps - currentYsteps;
+  return currentYsteps - nextYsteps;
 }
 
 void addUpAndDownInstruction(double nextTowerX, double nextTowerY) {
@@ -519,7 +525,8 @@ void subMoveStepCommon(int fromTower, int toTower) {
   if (towerDiff < 0) {
     if (towerDiff == -1) {
       double highestTowerY =  baseY + plateFreeMoveGap + (currentTowerStatus[fromTower - 1] * plateHieght);
-      double toTowerX = baseX / cos(rad(baseZAngle));
+      //      double toTowerX = (toTower == 1) ? baseX : (baseX / cos(rad(baseZAngle)));
+      double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
       long zSteps = -(stepsZ(baseZAngle));
@@ -528,7 +535,8 @@ void subMoveStepCommon(int fromTower, int toTower) {
       // move to right (-)  * 23
     } else {
       double highestTowerY =  baseY + plateFreeMoveGap + ((currentTowerStatus[fromTower - 1] > currentTowerStatus[fromTower - 2]) ? (currentTowerStatus[fromTower - 1] * plateHieght) : (currentTowerStatus[fromTower - 2] * plateHieght));
-      double toTowerX = baseX / cos(rad(baseZAngle));
+      //      double toTowerX = (toTower == 1) ? baseX : (baseX / cos(rad(baseZAngle)));
+      double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
       long zSteps = -(stepsZ(baseZAngle * 2));
@@ -539,7 +547,8 @@ void subMoveStepCommon(int fromTower, int toTower) {
   } else if (towerDiff > 0) {
     if (towerDiff == 1) {
       double highestTowerY =  baseY + plateFreeMoveGap + (currentTowerStatus[fromTower + 1] * plateHieght);
-      double toTowerX = baseX / cos(rad(baseZAngle));
+      //      double toTowerX = (toTower == 1) ? baseX : (baseX / cos(rad(baseZAngle)));
+      double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
       long zSteps = stepsZ(baseZAngle);
@@ -548,7 +557,8 @@ void subMoveStepCommon(int fromTower, int toTower) {
       // move to left  * 23
     } else {
       double highestTowerY =  baseY + plateFreeMoveGap + ((currentTowerStatus[fromTower + 1] > currentTowerStatus[fromTower + 2]) ? (currentTowerStatus[fromTower + 1] * plateHieght) : (currentTowerStatus[fromTower + 2] * plateHieght));
-      double toTowerX = baseX / cos(rad(baseZAngle));
+      //      double toTowerX = (toTower == 1) ? baseX : (baseX / cos(rad(baseZAngle)));
+      double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
       long zSteps = stepsZ(baseZAngle * 2);
@@ -581,82 +591,126 @@ void loop () {
     if (isReadyForNextMove) {
       currentMove++;
 
-      Serial.println("Current Move: ");
-      Serial.print("A1 rad : "); Serial.print(currentMove);
+      Serial.println(" ");
+      Serial.print("[MOTOR] : Current Move: "); Serial.print(currentMove);
 
       int fromTower = movesArray[currentMove][1];
       int toTower = movesArray[currentMove][2];
-      int currentTower = 0;
-//      if (currentMove > 0) {
-//        currentTower = movesArray[currentMove - 1][2];
-//      }
+
+      //      Serial.println(" ");
+      //      Serial.print("[MOTOR] : currentTower 1: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
+
+      //      if (currentMove > 0) {
+      //        currentTower = movesArray[currentMove - 1][2];
+      //      }
 
       if (currentTower == fromTower) {
+        Serial.println(" ");
+        Serial.print("[MOTOR] : currentTower 2: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
         subMoveStep_2(fromTower, toTower);
         currentTower = toTower;
       } else {
+        Serial.println(" ");
+        Serial.print("[MOTOR] : currentTower 3: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
         subMoveStepCommon(currentTower, fromTower);
         currentTower = fromTower;
+
+        Serial.println(" ");
+        Serial.print("[MOTOR] : currentTower 4: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
         subMoveStep_2(fromTower, toTower);
         currentTower = toTower;
       }
+
+      currentTowerStatus[fromTower]--;
+      currentTowerStatus[toTower]++;
 
       isReadyForNextMove = false;
     }
 
     Instruction instruction;
 
-    if (!queue.isEmpty () && isCurrentInstructionComplete) {
-      instruction = queue.dequeue ();
+    if (!queue.isEmpty ()) {
+      if (isCurrentInstructionComplete) {
+        instruction = queue.dequeue ();
 
-      if (instruction.type == INST_TYPE_UP_AND_DOWN) {
-        Serial.println("Current Instruction : UP_AND_DOWN"); Serial.print(" X "); Serial.print(instruction.x); Serial.print(" Y"); Serial.print(instruction.y);
-        isCurrentInstructionComplete = false;
-      } else if (instruction.type == INST_TYPE_UP_ROTATE) {
-        Serial.println("Current Instruction : ROTATE");Serial.print(" Z "); Serial.print(instruction.z);
-        isCurrentInstructionComplete = false;
-      } else if (instruction.type == INST_TYPE_UP_MAGNET) {
-        Serial.println("Current Instruction : MAGNET");
-        if (instruction.magnetStatus) {
-          digitalWrite(HEATER_0_PIN, HIGH);
+        if (instruction.type == INST_TYPE_UP_AND_DOWN) {
+          Serial.println(" ");
+          Serial.print("[MOTOR] : Current Instruction : UP_AND_DOWN"); Serial.print(" X: "); Serial.print(instruction.x); Serial.print(" Y: "); Serial.print(instruction.y);
+          currentInstructionType = INST_TYPE_UP_AND_DOWN;
+          //          YAxis.moveTo(instruction.y);
+          //          Serial.println(">>>>>>>>>>>>>>>>>> 1 ");
+          //          XAxis.moveTo(instruction.x);
+          //          Serial.println(">>>>>>>>>>>>>>>>>> 2 ");
+          isCurrentInstructionComplete = false;
+        } else if (instruction.type == INST_TYPE_UP_ROTATE) {
+          Serial.println(" ");
+          Serial.print("[MOTOR] : Current Instruction : ROTATE"); Serial.print(" Z: "); Serial.print(instruction.z);
+          currentInstructionType = INST_TYPE_UP_ROTATE;
+          ZAxis.moveTo(instruction.z);
+          isCurrentInstructionComplete = false;
+        } else if (instruction.type == INST_TYPE_UP_MAGNET) {
+          Serial.println(" ");
+          Serial.print("[MOTOR] : Current Instruction : MAGNET "); Serial.print(instruction.magnetStatus);
+          currentInstructionType = INST_TYPE_UP_MAGNET;
+          if (instruction.magnetStatus) {
+            //digitalWrite(HEATER_0_PIN, HIGH);
 
-        } else {
-          digitalWrite(HEATER_0_PIN    , LOW);
+          } else {
+            //digitalWrite(HEATER_0_PIN    , LOW);
+          }
+          isCurrentInstructionComplete = true;
         }
-        isCurrentInstructionComplete = true;
+        Serial.println(" ");
+        Serial.print("INSTRUCTION TYPE "); Serial.print(currentInstructionType);
       }
     } else {
       isReadyForNextMove = true;
     }
 
     if (YAxis.distanceToGo() != 0) {
+      //Serial.println(">>>>>>>>>>>>>>>>>> 3");
       YAxis.run();
     }
 
     if (XAxis.distanceToGo() != 0) {
+      //Serial.println(">>>>>>>>>>>>>>>>>> 4");
       XAxis.run();
     }
 
-    if (YAxis.distanceToGo() == 0 && XAxis.distanceToGo() == 0 && instruction.type == INST_TYPE_UP_AND_DOWN) {
+    if (YAxis.distanceToGo() == 0 && XAxis.distanceToGo() == 0 && currentInstructionType == INST_TYPE_UP_AND_DOWN) {
+      Serial.println(">>>>>>>>>>>>>>>>>> 5");
       isCurrentInstructionComplete = true;
       XAxis.setCurrentPosition(0);
       YAxis.setCurrentPosition(0);
+//      delay(3000);
     }
 
     if (ZAxis.distanceToGo() != 0) {
+      //Serial.println(">>>>>>>>>>>>>>>>>> 6");
       ZAxis.run();
     }
 
-    if (ZAxis.distanceToGo() == 0 && instruction.type == INST_TYPE_UP_ROTATE) {
+//    if(currentInstructionType == INST_TYPE_UP_ROTATE){
+//      Serial.println(">>>>>>>>>>>>>>>>>> 8");
+//      if(ZAxis.distanceToGo() == 0){
+//        Serial.println(">>>>>>>>>>>>>>>>>> 9");
+//      }
+//    }
+
+//    Serial.print("INSTRUCTION TYPE "); Serial.print(instruction.type);
+    
+    if (ZAxis.distanceToGo() == 0 && currentInstructionType == INST_TYPE_UP_ROTATE) {
+      Serial.println(">>>>>>>>>>>>>>>>>> 7");
       isCurrentInstructionComplete = true;
       ZAxis.setCurrentPosition(0);
+//      delay(3000);
     }
 
 
     // add robot movements here with above queue
 
   } else {
-    Serial.println("FINISHED!");
+//    Serial.println("FINISHED!");
     // todo call init procedure
   }
 
@@ -910,18 +964,18 @@ void stepsXandY(double x, double y) {
   currentXsteps = nextXsteps;
   nextXsteps = round (foreArmSteps);
 
-  Serial.println(" ");
-  Serial.print("A1 rad : "); Serial.print(A1); Serial.print("  A1 deg : "); Serial.print(backArmAngle); Serial.print("  Y move angle : "); Serial.print(backArmMoveAngle);
-  Serial.print("  Y steps : "); Serial.print(backArmSteps);
-  Serial.println(" ");
-  Serial.print("A2 rad : "); Serial.print(A2); Serial.print("  A2 deg : "); Serial.print(foreArmAngle); Serial.print("  X move angle : "); Serial.print(foreArmMoveAngle);
-  Serial.print("  X steps : "); Serial.print(foreArmSteps);
+  //  Serial.println(" ");
+  //  Serial.print("A1 rad : "); Serial.print(A1); Serial.print("  A1 deg : "); Serial.print(backArmAngle); Serial.print("  Y move angle : "); Serial.print(backArmMoveAngle);
+  //  Serial.print("  Y steps : "); Serial.print(backArmSteps);
+  //  Serial.println(" ");
+  //  Serial.print("A2 rad : "); Serial.print(A2); Serial.print("  A2 deg : "); Serial.print(foreArmAngle); Serial.print("  X move angle : "); Serial.print(foreArmMoveAngle);
+  //  Serial.print("  X steps : "); Serial.print(foreArmSteps);
 }
 
 long stepsZ(double zAxixAngle) {
   long zSteps = round(Z_MOTOR_STEPS / 360 * zAxixAngle);
-  Serial.println(" ");
-  Serial.print("Z steps : "); Serial.print(zSteps);
+  //  Serial.println(" ");
+  //  Serial.print("Z steps : "); Serial.print(zSteps);
   return zSteps;
 }
 
