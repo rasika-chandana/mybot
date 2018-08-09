@@ -3,9 +3,10 @@
 #include <AccelStepper.h>
 #include <MultiStepper.h>
 #include <math.h>
-#include "U8glib.h"
 #include <QueueArray.h>
-
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include "U8glib.h"
 
 #define X_STEP_PIN         54
 #define X_DIR_PIN          55
@@ -60,9 +61,6 @@ static const double Z_MOTOR_STEPS = 51109.33;
 static const double X_INIT_ANGLE = 24.1;
 static const double Y_INIT_ANGLE = 13.4 ;
 
-
-U8GLIB_ST7920_128X64_1X u8g(23, 17, 16);  // SPI Com: SCK = en = 18, MOSI = rw = 16, CS = di = 17
-
 AccelStepper XAxis(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
 AccelStepper YAxis(AccelStepper::DRIVER, Y_STEP_PIN, Y_DIR_PIN);
 AccelStepper ZAxis(AccelStepper::DRIVER, Z_STEP_PIN, Z_DIR_PIN);
@@ -74,7 +72,6 @@ long initial_homing = -1; // Used to Home Stepper at startup
 long initial_y_homing = -1; // Used to Home Stepper at startup
 long initial_z_homing = -1; // Used to Home Stepper at startup
 long initial_x_homing = -1; // Used to Home Stepper at startup
-
 
 long direction = 10000;
 long distanceToGo = 0;
@@ -88,7 +85,8 @@ int currentTowerStatus[] = {0, 0, 0};
 int currentTower = 0;
 int currentInstructionType = 0;
 
-boolean isPlatesReady = true;
+boolean isHanoiInputReady = false;
+boolean isPlatesReady = false;
 boolean isReadyForNextMove = true;
 boolean isCurrentInstructionComplete = true;
 
@@ -120,26 +118,86 @@ typedef struct {
 
 QueueArray <Instruction> queue;
 
+// ===============  START GRAPHIC =================
+
+U8GLIB_ST7920_128X64_1X u8g(23, 17, 16);
+/* Rotary encoder (dial) pins */
+#define ROT_EN_A 31
+#define ROT_EN_B 33
+/* Rotary encoder button pin */
+#define BUTTON_DIO 35
+/* Reset button pin */
+#define RESET_DIO 41
+/* Buzzer pin */
+#define BUZZER_DIO 37
+
+#define INIT_SCREEN_ITEMS 4
+#define MAIN_MENU_ITEMS 2
+#define PLATE_MENU_ITEMS 6
+#define TOWER_MENU_ITEMS 2
+
+const char *initScreenItems[INIT_SCREEN_ITEMS] = { "AKISAR", "Moving","to", "Home Position"};
+
+const char *mainMenuItems[MAIN_MENU_ITEMS] = { "Number of Plates : ", "Destination Tower: "};
+char *mainMenuValues[MAIN_MENU_ITEMS] = { "6", "B"};
+
+const char *plateMenuItems[PLATE_MENU_ITEMS] = { "Number of plates"};
+const char *plateMenuValues[PLATE_MENU_ITEMS] = { "1", "2", "3", "4", "5", "6"};
+
+const char *towerMenuItems[TOWER_MENU_ITEMS] = { "Destination Tower"};
+const char *towerMenuValues[TOWER_MENU_ITEMS] = { "B", "C"};
+
+uint8_t currentNumberOfMenuItems = MAIN_MENU_ITEMS;
+uint8_t currentMenuItem = 0;
+uint8_t currentPageNumber = 0;
+
+uint8_t menu_redraw_required = 1;
+
+volatile int myInterruptVar = 0;
+volatile int rotary_button_checked = 0;
+volatile int reset_button_checked = 0;
+
+volatile uint8_t rotary_button_pressd = 0;
+volatile uint8_t reset_button_pressd = 0;
+
+volatile uint8_t rotary_button_check = 1;
+volatile uint8_t reset_button_check = 1;
+
+volatile byte DialCount = 120;
+volatile byte PreDialCount = 120;
+volatile byte DialPos = 0;
+volatile byte Last_DialPos = 0;
+
+// ===============  END GRAPHIC =================
+
 void setup() {
-  // flip screen, if required
-  // u8g.setRot180();
 
-  // set SPI backup if required
-  //u8g.setHardwareBackup(u8g_backup_avr_spi);
+  cli();          // disable global interrupts
+  TCCR3A = 0;     // set entire TCCR3A register to 0
+  TCCR3B = 0;     // same for TCCR3B
 
-  // assign default color value
-  if ( u8g.getMode() == U8G_MODE_R3G3B2 ) {
-    u8g.setColorIndex(255);     // white
-  }
-  else if ( u8g.getMode() == U8G_MODE_GRAY2BIT ) {
-    u8g.setColorIndex(3);         // max intensity
-  }
-  else if ( u8g.getMode() == U8G_MODE_BW ) {
-    u8g.setColorIndex(1);         // pixel on
-  }
-  else if ( u8g.getMode() == U8G_MODE_HICOLOR ) {
-    u8g.setHiColorByRGB(255, 255, 255);
-  }
+  // set compare match register to desired timer count:  @~744 Hz
+  OCR3A = 150;
+  // turn on CTC mode:
+  TCCR3B |= (1 << WGM32);
+  // Set CS10 and CS12 bits for 1024 prescaler:
+  TCCR3B |= (1 << CS30) | (1 << CS32);
+  // enable timer compare interrupt:
+  TIMSK3 |= (1 << OCIE3B);
+  // enable global interrupts:
+  sei();
+  
+  drawDisplay();
+  
+  pinMode(BUZZER_DIO, OUTPUT);
+  pinMode(BUTTON_DIO, INPUT);
+  digitalWrite(BUTTON_DIO, HIGH);
+  pinMode(RESET_DIO, INPUT);
+  digitalWrite(RESET_DIO, HIGH);
+  pinMode(ROT_EN_A, INPUT);
+  pinMode(ROT_EN_B, INPUT);
+  digitalWrite(ROT_EN_A, HIGH);
+  digitalWrite(ROT_EN_B, HIGH);
 
   pinMode(FAN_PIN , OUTPUT);
   pinMode(HEATER_0_PIN , OUTPUT);
@@ -196,8 +254,6 @@ void setup() {
 
   Serial.begin(9600);
 
-
-  // draw();
   homeYAxis();
   homeXAxis();
   homeZAxis();
@@ -218,8 +274,9 @@ void setup() {
   YAxis.setAcceleration(1000.0);
   ZAxis.setAcceleration(500.0);
 
-  hanoiNoOfMoves();
-  goToStartPoint();
+  currentPageNumber = 1;
+  //hanoiNoOfMoves();
+  //goToStartPoint();
 }
 
 void initialize(void) {
@@ -478,21 +535,6 @@ void goToStartPoint(void) {
   currentTowerStatus[0] = numberOfPlates;
 }
 
-
-void draw(void) {
-  // graphic commands to redraw the complete screen should be placed here
-  u8g.setFont(u8g_font_courR08);
-  u8g.drawStr( 0, 7, "The Bot is Ready");
-  u8g.drawStr( 0, 15, "Rasika!");
-
-  //  char buf[9];
-  //  sprintf (buf, "%d", direction);
-  //  u8g.drawStr(18, 20, buf);
-  //  sprintf (buf, "%d", distanceToGo);
-  //  u8g.drawStr(18, 28, buf);
-
-}
-
 long getDeltaXsteps() {
   return nextXsteps - currentXsteps;
 }
@@ -531,7 +573,7 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       } else {
         highestTowerY = highestTowerY + ((currentTowerStatus[fromTower] + carryPlate) * plateHieght);
       }
-      
+
       //      double toTowerX = (toTower == 1) ? baseX : (baseX / cos(rad(baseZAngle)));
       double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
@@ -542,7 +584,7 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       // move to right (-)  * 23
     } else {
       double highestTowerY =  baseY + plateFreeMoveGap;
-      
+
       if ((currentTowerStatus[fromTower - 1] > currentTowerStatus[fromTower]) && (currentTowerStatus[fromTower - 1] > currentTowerStatus[fromTower - 2])) {
         highestTowerY = highestTowerY + ((currentTowerStatus[fromTower - 1] + carryPlate) * plateHieght);
       } else if ((currentTowerStatus[fromTower - 2] > currentTowerStatus[fromTower]) && (currentTowerStatus[fromTower - 2] > currentTowerStatus[fromTower - 1])) {
@@ -618,7 +660,8 @@ void subMoveStep_2(int fromTower, int toTower) {
 
 
 void loop () {
-
+  drawDisplay();
+  
   if (isPlatesReady && (currentMove < numberOfMoves)) {
     if (isReadyForNextMove) {
       currentMove++;
@@ -854,6 +897,251 @@ long stepsZ(double zAxixAngle) {
   //  Serial.print("Z steps : "); Serial.print(zSteps);
   return zSteps;
 }
+
+
+
+void drawCurrentPage(void) {
+  if (0 == currentPageNumber) {
+    drawInitScreen();
+  } else if (1 == currentPageNumber) {
+    drawFirstPage();
+  } else if (2 == currentPageNumber) {
+    drawNumberOfPlatesPage();
+  } else if (3 == currentPageNumber) {
+    drawDestinationTowerPage();
+  }
+}
+
+void drawInitScreen(void) {
+  uint8_t i, h;
+  u8g_uint_t w, d, hieght;
+
+  u8g.setFont(u8g_font_fub20);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+  u8g.setDefaultForegroundColor();
+
+  h = u8g.getFontAscent() - u8g.getFontDescent();
+  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+  d = 5;
+
+  d = (w - u8g.getStrWidth(initScreenItems[0])) / 2;
+  u8g.drawStr(d, 2, initScreenItems[0]);
+
+  u8g.setFont(u8g_font_6x12);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+
+  //  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+
+  d = (w - u8g.getStrWidth(initScreenItems[1])) / 2;
+  u8g.drawStr(d, (h + 5), initScreenItems[1]);
+
+  d = (w - u8g.getStrWidth(initScreenItems[2])) / 2;
+  u8g.drawStr(d, (h + 15), initScreenItems[2]);
+
+  d = (w - u8g.getStrWidth(initScreenItems[3])) / 2;
+  u8g.drawStr(d, (h + 25), initScreenItems[3]);
+}
+
+void drawNumberOfPlatesPage(void) {
+  uint8_t i, h;
+  u8g_uint_t w, d, hieght;
+
+  u8g.setFont(u8g_font_6x12);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+  u8g.setDefaultForegroundColor();
+
+  h = u8g.getFontAscent() - u8g.getFontDescent();
+  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+  d = 5;
+
+  d = (w - u8g.getStrWidth(plateMenuItems[0])) / 2;
+  u8g.drawStr(d, 2, plateMenuItems[0]);
+
+  u8g.setFont(u8g_font_osb35);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+
+  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+
+  d = (w - u8g.getStrWidth(plateMenuValues[currentMenuItem])) / 2;
+  u8g.drawStr(d, (h + 10), plateMenuValues[currentMenuItem]);
+  //Serial.print("H >> "); Serial.println(h); Serial.print("W >> "); Serial.println(w); Serial.print("hieght >> "); Serial.println(hieght);
+}
+
+void drawDestinationTowerPage(void) {
+  uint8_t i, h;
+  u8g_uint_t w, d, hieght;
+
+  u8g.setFont(u8g_font_6x12);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+  u8g.setDefaultForegroundColor();
+
+  h = u8g.getFontAscent() - u8g.getFontDescent();
+  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+
+  d = (w - u8g.getStrWidth(towerMenuItems[0])) / 2;
+  u8g.drawStr(d, 2, towerMenuItems[0]);
+
+  u8g.setFont(u8g_font_osb35);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+
+  w = u8g.getWidth();
+  //hieght = u8g.getHeight();
+
+  d = (w - u8g.getStrWidth(towerMenuValues[currentMenuItem])) / 2;
+  u8g.drawStr(d, (h + 10), towerMenuValues[currentMenuItem]);
+  //Serial.print("H >> "); Serial.println(h); Serial.print("W >> "); Serial.println(w); Serial.print("hieght >> "); Serial.println(hieght);
+}
+
+void drawFirstPage(void) {
+  uint8_t i, h;
+  u8g_uint_t w, d, hieght;
+
+  u8g.setFont(u8g_font_6x12);
+  u8g.setFontRefHeightText();
+  u8g.setFontPosTop();
+
+  h = u8g.getFontAscent() - u8g.getFontDescent();
+  w = u8g.getWidth();
+  hieght = u8g.getHeight();
+
+  Serial.print("H >> "); Serial.println(h); Serial.print("W >> "); Serial.println(w); Serial.print("hieght >> "); Serial.println(hieght);
+
+  for ( i = 0; i < MAIN_MENU_ITEMS; i++ ) {
+    //d = (w - u8g.getStrWidth(mainMenuItems[i])) / 2;
+    d = 1;
+    u8g.setDefaultForegroundColor();
+    if ( i == currentMenuItem ) {
+      u8g.drawBox(0, i * h + 2, w, h);
+      u8g.setDefaultBackgroundColor();
+    }
+    u8g.drawStr(d, i * h + 2, mainMenuItems[i]);
+    u8g.drawStr(w - 15, i * h + 2, mainMenuValues[i]);
+  }
+}
+
+void handleRotaryButton(void) {
+  Serial.println("Rotary Button pressed >>>> ");
+  if (1 == currentPageNumber) {
+    if (0 == currentMenuItem) {
+      currentPageNumber = 2;
+      currentNumberOfMenuItems = PLATE_MENU_ITEMS;
+      currentMenuItem = 0;
+    } else if (1 == currentMenuItem) {
+      currentPageNumber = 3;
+      currentNumberOfMenuItems = TOWER_MENU_ITEMS;
+      currentMenuItem = 0;
+    }
+  } else if (2 == currentPageNumber) {
+    mainMenuValues[0] = plateMenuValues[currentMenuItem];
+    currentPageNumber = 1;
+    currentNumberOfMenuItems = MAIN_MENU_ITEMS;
+    currentMenuItem = 0;
+  } else if (3 == currentPageNumber) {
+    mainMenuValues[1] = towerMenuValues[currentMenuItem];
+    currentPageNumber = 1;
+    currentNumberOfMenuItems = MAIN_MENU_ITEMS;
+    currentMenuItem = 1;
+  } else {
+    mainMenuValues[0] = "3";
+    mainMenuValues[1] = "B";
+    currentPageNumber = 1;
+    currentNumberOfMenuItems = MAIN_MENU_ITEMS;
+    currentMenuItem = 0;
+  }
+  menu_redraw_required = 1;
+}
+
+void handleResetButton(void) {
+  Serial.println("Reset Button pressed >>>> ");
+  menu_redraw_required = 1;
+}
+
+void drawDisplay(void) {
+  if (  menu_redraw_required != 0 ) {
+    u8g.firstPage();
+    do  {
+      drawCurrentPage();
+    } while ( u8g.nextPage() );
+    menu_redraw_required = 0;
+  }
+
+  if (myInterruptVar > 1000) {
+    myInterruptVar = 0;
+  }
+
+  if (rotary_button_pressd == 1) {
+    handleRotaryButton();
+    rotary_button_pressd = 0;
+  }
+
+  if (reset_button_pressd == 1) {
+    handleResetButton();
+    reset_button_pressd = 0;
+  }
+
+  if (DialCount != PreDialCount) {
+    //Serial.println("DialCount >>>> "); Serial.print(DialCount);
+    PreDialCount = DialCount;
+    currentMenuItem = DialCount % currentNumberOfMenuItems;
+    menu_redraw_required = 1;
+  }
+}
+
+ISR(TIMER3_COMPB_vect)
+{
+  if (!digitalRead(BUTTON_DIO) && rotary_button_check == 1) {
+    rotary_button_pressd = 1;
+    rotary_button_checked = myInterruptVar;
+    rotary_button_check = 0;
+  }
+
+  if (!digitalRead(RESET_DIO) && reset_button_check == 1) {
+    reset_button_pressd = 1;
+    reset_button_checked = myInterruptVar;
+    reset_button_check = 0;
+  }
+
+
+  if (abs(myInterruptVar - rotary_button_checked) > 70) {
+    rotary_button_check = 1;
+  }
+
+  if (abs(myInterruptVar - reset_button_checked) > 70) {
+    reset_button_check = 1;
+  }
+
+  DialPos = (digitalRead(ROT_EN_B) << 1) | digitalRead(ROT_EN_A);
+
+  if (DialPos == 3 && Last_DialPos == 1)
+  {
+    /* If so increase the dial counter and display it */
+    DialCount++;
+  }
+
+  /* Is the dial being turned counter-clockwise ? */
+  if (DialPos == 3 && Last_DialPos == 2)
+  {
+    /* If so decrease the dial counter and display it */
+    DialCount--;
+  }
+
+  Last_DialPos = DialPos;
+
+  myInterruptVar++;
+  //Serial.println("++++++++++++++++++++++++++++++++++++++++++");
+}
+
 
 
 
