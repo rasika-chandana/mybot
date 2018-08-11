@@ -59,7 +59,7 @@ static const long Y_MOTOR_STEPS = 121600;
 static const double Z_MOTOR_STEPS = 51109.33;
 
 static const double X_INIT_ANGLE = 24.1;
-static const double Y_INIT_ANGLE = 13.4 ;
+static const double Y_INIT_ANGLE = 13.05 ;
 
 AccelStepper XAxis(AccelStepper::DRIVER, X_STEP_PIN, X_DIR_PIN);
 AccelStepper YAxis(AccelStepper::DRIVER, Y_STEP_PIN, Y_DIR_PIN);
@@ -77,6 +77,8 @@ long direction = 10000;
 long distanceToGo = 0;
 
 int numberOfPlates = 3;
+int destinationTower = 1;
+int intermediateTower = 2;
 
 int** movesArray = NULL;
 int numberOfMoves = 0;
@@ -132,13 +134,13 @@ U8GLIB_ST7920_128X64_1X u8g(23, 17, 16);
 #define BUZZER_DIO 37
 
 #define INIT_SCREEN_ITEMS 4
-#define MAIN_MENU_ITEMS 2
+#define MAIN_MENU_ITEMS 3
 #define PLATE_MENU_ITEMS 6
 #define TOWER_MENU_ITEMS 2
 
-const char *initScreenItems[INIT_SCREEN_ITEMS] = { "AKISAR", "Moving","to", "Home Position"};
+const char *initScreenItems[INIT_SCREEN_ITEMS] = { "AKISAR", "Moving", "to", "Home Position"};
 
-const char *mainMenuItems[MAIN_MENU_ITEMS] = { "Number of Plates : ", "Destination Tower: "};
+const char *mainMenuItems[MAIN_MENU_ITEMS] = { "Number of Plates : ", "Destination Tower: ", "START"};
 char *mainMenuValues[MAIN_MENU_ITEMS] = { "6", "B"};
 
 const char *plateMenuItems[PLATE_MENU_ITEMS] = { "Number of plates"};
@@ -186,9 +188,9 @@ void setup() {
   TIMSK3 |= (1 << OCIE3B);
   // enable global interrupts:
   sei();
-  
+
   drawDisplay();
-  
+
   pinMode(BUZZER_DIO, OUTPUT);
   pinMode(BUTTON_DIO, INPUT);
   digitalWrite(BUTTON_DIO, HIGH);
@@ -275,6 +277,7 @@ void setup() {
   ZAxis.setAcceleration(500.0);
 
   currentPageNumber = 1;
+  currentMenuItem = 0;
   //hanoiNoOfMoves();
   //goToStartPoint();
 }
@@ -661,7 +664,21 @@ void subMoveStep_2(int fromTower, int toTower) {
 
 void loop () {
   drawDisplay();
-  
+
+  if (isHanoiInputReady) {
+    hanoiNoOfMoves();
+    goToStartPoint();
+    isHanoiInputReady = false;
+    isPlatesReady = true;
+  }
+
+  //      Serial.println("numberOfPlates >>>> ");
+  //      Serial.print(numberOfPlates);
+  //      Serial.print(" destinationTower >>>> ");
+  //      Serial.print(destinationTower);
+  //      Serial.print(" intermediateTower >>>> ");
+  //      Serial.print(intermediateTower);
+
   if (isPlatesReady && (currentMove < numberOfMoves)) {
     if (isReadyForNextMove) {
       currentMove++;
@@ -792,8 +809,14 @@ void loop () {
 
 
 void hanoiNoOfMoves(void) {
+  numberOfMoves = (round(pow(2, numberOfPlates))) - 1;
 
-  numberOfMoves = pow(2, numberOfPlates) - 1;
+//  Serial.println("Hanoi plates :- ");
+//  Serial.print(numberOfPlates);
+//  Serial.print(" Number Of Moves :- ");
+//  Serial.print(numberOfMoves);
+//  Serial.print(" Pow function :- ");
+//  Serial.print(pow(2, numberOfPlates));
 
   if (movesArray != NULL) {
     movesArray = (int**) realloc(movesArray, numberOfMoves * sizeof(int));
@@ -806,11 +829,16 @@ void hanoiNoOfMoves(void) {
     movesArray[iRow] = (int *) malloc(3 * sizeof(int));
   }
 
-  Serial.println("Hanoi :- ");
-  Serial.println(numberOfPlates);
+//  Serial.println("Hanoi plates :- ");
+//  Serial.print(numberOfPlates);
+//  Serial.print(" Number Of Moves :- ");
+//  Serial.print(numberOfMoves);
+//  Serial.print(" Pow function :- ");
+//  Serial.print(pow(2, numberOfPlates));
+
 
   currentMove = -1;
-  towerOfHanoi(numberOfPlates, 0, 1, 2);
+  towerOfHanoi(numberOfPlates, 0, destinationTower, intermediateTower);
 
   for (int iRow = 0 ; iRow < numberOfMoves ; iRow++)
   {
@@ -1004,7 +1032,7 @@ void drawDestinationTowerPage(void) {
 }
 
 void drawFirstPage(void) {
-  uint8_t i, h;
+  uint8_t i, h, th;
   u8g_uint_t w, d, hieght;
 
   u8g.setFont(u8g_font_6x12);
@@ -1018,15 +1046,22 @@ void drawFirstPage(void) {
   Serial.print("H >> "); Serial.println(h); Serial.print("W >> "); Serial.println(w); Serial.print("hieght >> "); Serial.println(hieght);
 
   for ( i = 0; i < MAIN_MENU_ITEMS; i++ ) {
-    //d = (w - u8g.getStrWidth(mainMenuItems[i])) / 2;
     d = 1;
+    th = 2;
+    if (i == (MAIN_MENU_ITEMS - 1)) {
+      d = (w - u8g.getStrWidth(mainMenuItems[i])) / 2;
+      th = 8;
+    }
+
     u8g.setDefaultForegroundColor();
     if ( i == currentMenuItem ) {
-      u8g.drawBox(0, i * h + 2, w, h);
+      u8g.drawBox(0, i * h + th, w, h);
       u8g.setDefaultBackgroundColor();
     }
-    u8g.drawStr(d, i * h + 2, mainMenuItems[i]);
-    u8g.drawStr(w - 15, i * h + 2, mainMenuValues[i]);
+    u8g.drawStr(d, i * h + th, mainMenuItems[i]);
+    if (i != (MAIN_MENU_ITEMS - 1)) {
+      u8g.drawStr(w - 15, i * h + th, mainMenuValues[i]);
+    }
   }
 }
 
@@ -1041,6 +1076,24 @@ void handleRotaryButton(void) {
       currentPageNumber = 3;
       currentNumberOfMenuItems = TOWER_MENU_ITEMS;
       currentMenuItem = 0;
+    } else if (2 == currentMenuItem) {
+      isHanoiInputReady = true;
+      numberOfPlates = atoi(mainMenuValues[0]);
+
+      if ("B" == mainMenuValues[1]) {
+        destinationTower = 1;
+        intermediateTower = 2;
+      } else if ("C" == mainMenuValues[1]) {
+        destinationTower = 2;
+        intermediateTower = 1;
+      }
+
+      Serial.println("numberOfPlates >>>> ");
+      Serial.print(numberOfPlates);
+      Serial.print(" destinationTower >>>> ");
+      Serial.print(destinationTower);
+      Serial.print(" intermediateTower >>>> ");
+      Serial.print(intermediateTower);
     }
   } else if (2 == currentPageNumber) {
     mainMenuValues[0] = plateMenuValues[currentMenuItem];
