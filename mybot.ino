@@ -267,6 +267,15 @@ void setup() {
   //homeXAxis();
   gotoInitZPosition();
 
+  setMotorSpeedAndPosition();
+  
+  currentPageNumber = 1;
+  currentMenuItem = 0;
+  //hanoiNoOfMoves();
+  //goToStartPoint();
+}
+
+void setMotorSpeedAndPosition(void) {
   XAxis.setCurrentPosition(0);
   YAxis.setCurrentPosition(0);
   ZAxis.setCurrentPosition(0);
@@ -278,11 +287,6 @@ void setup() {
   XAxis.setAcceleration(1000.0);
   YAxis.setAcceleration(1000.0);
   ZAxis.setAcceleration(500.0);
-
-  currentPageNumber = 1;
-  currentMenuItem = 0;
-  //hanoiNoOfMoves();
-  //goToStartPoint();
 }
 
 void initialize(void) {
@@ -726,8 +730,8 @@ void loop () {
         currentTowerStatus[fromTower]--;
         currentTowerStatus[toTower]++;
 
-      }else{
-        Serial.println(" <<<<<<<<<<<<<<< THIS IS THE LAST MOVE >>>>>>>>>>>>>>");       
+      } else {
+        Serial.println(" <<<<<<<<<<<<<<< THIS IS THE LAST MOVE >>>>>>>>>>>>>>");
       }
 
       isReadyForNextMove = false;
@@ -767,14 +771,14 @@ void loop () {
         Serial.println(" ");
         Serial.print("INSTRUCTION TYPE "); Serial.print(currentInstructionType);
       }
-    } else if (currentMove < numberOfMoves){
+    } else if (currentMove < numberOfMoves) {
       isReadyForNextMove = true;
-    }else if(isCurrentInstructionComplete && (currentMove == numberOfMoves)){
+    } else if (isCurrentInstructionComplete && (currentMove == numberOfMoves)) {
       Serial.println(" <<<<<<<<<<<<<<< All done >>>>>>>>>>>>>>");
       isPlatesReady = false;
       numberOfMoves = 0;
-      currentMove = -1; 
-      currentTowerStatus[0] = 0;     
+      currentMove = -1;
+      currentTowerStatus[0] = 0;
       currentTowerStatus[1] = 0;
       currentTowerStatus[2] = 0;
       currentTower = 0;
@@ -782,6 +786,11 @@ void loop () {
 
       isReadyForNextMove = true;
       isCurrentInstructionComplete = true;
+
+      homeYAxis();
+      homeXAxis();
+
+      setMotorSpeedAndPosition();
     }
 
     if (YAxis.distanceToGo() != 0) {
