@@ -88,6 +88,7 @@ int currentTower = 0;
 int currentInstructionType = 0;
 
 boolean isHanoiInputReady = false;
+boolean isTowerApositionReady = false;
 boolean isPlatesReady = false;
 boolean isReadyForNextMove = true;
 boolean isCurrentInstructionComplete = true;
@@ -171,6 +172,8 @@ volatile byte PreDialCount = 120;
 volatile byte DialPos = 0;
 volatile byte Last_DialPos = 0;
 
+String message1 = "Press 'START' to";
+String message2 = "to go Tower A";
 // ===============  END GRAPHIC =================
 
 void setup() {
@@ -268,7 +271,7 @@ void setup() {
   gotoInitZPosition();
 
   setMotorSpeedAndPosition();
-  
+
   currentPageNumber = 1;
   currentMenuItem = 0;
   //hanoiNoOfMoves();
@@ -545,6 +548,16 @@ void goToStartPoint(void) {
   currentTowerStatus[0] = numberOfPlates;
 }
 
+void goToTowerBFromTowerC(void) {
+  ZAxis.moveTo(-(baseZSteps));
+
+  while (ZAxis.distanceToGo() != 0) {
+    ZAxis.run();
+  }
+
+  ZAxis.setCurrentPosition(0);
+}
+
 long getDeltaXsteps() {
   return nextXsteps - currentXsteps;
 }
@@ -676,11 +689,13 @@ void subMoveStep_2(int fromTower, int toTower) {
 void loop () {
   drawDisplay();
 
-  if (isHanoiInputReady) {
+  if (!isTowerApositionReady && isHanoiInputReady) {
     hanoiNoOfMoves();
     goToStartPoint();
-    isHanoiInputReady = false;
-    isPlatesReady = true;
+    isTowerApositionReady = true;
+    message1 = "Place the plates and";
+    message2 = "press 'START' again";
+    menu_redraw_required = 1;
   }
 
   //      Serial.println("numberOfPlates >>>> ");
@@ -775,7 +790,19 @@ void loop () {
       isReadyForNextMove = true;
     } else if (isCurrentInstructionComplete && (currentMove == numberOfMoves)) {
       Serial.println(" <<<<<<<<<<<<<<< All done >>>>>>>>>>>>>>");
+
+      homeYAxis();
+      homeXAxis();
+
+      if (currentTower == 2) {
+        Serial.println(">>>>>>>>>>>>>>>>>> CURRENT TOWER IS C >>>>>>>>>>>>>>>>>>>>>>>>");
+        goToTowerBFromTowerC();
+      }
+
+      isHanoiInputReady = false;
+      isTowerApositionReady = false;
       isPlatesReady = false;
+
       numberOfMoves = 0;
       currentMove = -1;
       currentTowerStatus[0] = 0;
@@ -787,10 +814,11 @@ void loop () {
       isReadyForNextMove = true;
       isCurrentInstructionComplete = true;
 
-      homeYAxis();
-      homeXAxis();
-
       setMotorSpeedAndPosition();
+
+      message1 = "Press 'START' to";
+      message2 = "to go Tower A";
+      menu_redraw_required = 1;
     }
 
     if (YAxis.distanceToGo() != 0) {
@@ -1074,6 +1102,7 @@ void drawFirstPage(void) {
   u8g.setFont(u8g_font_6x12);
   u8g.setFontRefHeightText();
   u8g.setFontPosTop();
+  u8g.setDefaultForegroundColor();
 
   h = u8g.getFontAscent() - u8g.getFontDescent();
   w = u8g.getWidth();
@@ -1086,7 +1115,7 @@ void drawFirstPage(void) {
     th = 2;
     if (i == (MAIN_MENU_ITEMS - 1)) {
       d = (w - u8g.getStrWidth(mainMenuItems[i])) / 2;
-      th = 8;
+      th = 4;
     }
 
     u8g.setDefaultForegroundColor();
@@ -1099,6 +1128,21 @@ void drawFirstPage(void) {
       u8g.drawStr(w - 15, i * h + th, mainMenuValues[i]);
     }
   }
+
+  u8g.setDefaultForegroundColor();
+  u8g.drawFrame(0, 0, w, 33);
+  u8g.drawFrame(0, 34, w, 30);
+
+
+  if (message2.length() > 0) {
+    d = (w - u8g.getStrWidth(message1.c_str())) / 2;
+    u8g.drawStr(d, 38, message1.c_str());
+    d = (w - u8g.getStrWidth(message2.c_str())) / 2;
+    u8g.drawStr(d, 49, message2.c_str());
+  } else {
+
+  }
+
 }
 
 void handleRotaryButton(void) {
@@ -1113,23 +1157,31 @@ void handleRotaryButton(void) {
       currentNumberOfMenuItems = TOWER_MENU_ITEMS;
       currentMenuItem = 0;
     } else if (2 == currentMenuItem) {
-      isHanoiInputReady = true;
-      numberOfPlates = atoi(mainMenuValues[0]);
+      if (!isHanoiInputReady) {
+        isHanoiInputReady = true;
+        numberOfPlates = atoi(mainMenuValues[0]);
 
-      if ("B" == mainMenuValues[1]) {
-        destinationTower = 1;
-        intermediateTower = 2;
-      } else if ("C" == mainMenuValues[1]) {
-        destinationTower = 2;
-        intermediateTower = 1;
+        if ("B" == mainMenuValues[1]) {
+          destinationTower = 1;
+          intermediateTower = 2;
+        } else if ("C" == mainMenuValues[1]) {
+          destinationTower = 2;
+          intermediateTower = 1;
+        }
+
+        Serial.println("numberOfPlates >>>> ");
+        Serial.print(numberOfPlates);
+        Serial.print(" destinationTower >>>> ");
+        Serial.print(destinationTower);
+        Serial.print(" intermediateTower >>>> ");
+        Serial.print(intermediateTower);
+      } else if (isTowerApositionReady && !isPlatesReady) {
+        isPlatesReady = true;
+
+        message1 = "Plate moving";
+        message2 = "STARTED!";
+        menu_redraw_required = 1;
       }
-
-      Serial.println("numberOfPlates >>>> ");
-      Serial.print(numberOfPlates);
-      Serial.print(" destinationTower >>>> ");
-      Serial.print(destinationTower);
-      Serial.print(" intermediateTower >>>> ");
-      Serial.print(intermediateTower);
     }
   } else if (2 == currentPageNumber) {
     mainMenuValues[0] = plateMenuValues[currentMenuItem];
