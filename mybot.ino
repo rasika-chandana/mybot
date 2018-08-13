@@ -97,6 +97,7 @@ int plateFreeMoveGap = 5;
 int baseX = 409;
 int baseY = -216;
 double baseZAngle = 23;
+long baseZSteps = 0;
 
 int isMagnetOn = 0;
 
@@ -191,6 +192,8 @@ void setup() {
 
   drawDisplay();
 
+  baseZSteps = stepsZ(baseZAngle);
+  
   pinMode(BUZZER_DIO, OUTPUT);
   pinMode(BUTTON_DIO, INPUT);
   digitalWrite(BUTTON_DIO, HIGH);
@@ -496,9 +499,9 @@ void gotoInitZPosition(void) {
   //
   //  ZAxis.setCurrentPosition(0);
 
-  ZAxis.moveTo(-20820);
+  ZAxis.moveTo(-21400);
 
-  while (ZAxis.distanceToGo() != 0) {
+  while (ZAxis.distanceToGo() != 0) { 
     ZAxis.run();
   }
 
@@ -506,7 +509,7 @@ void gotoInitZPosition(void) {
 }
 
 void goToStartPoint(void) {
-  ZAxis.moveTo(-(stepsZ(baseZAngle)));
+  ZAxis.moveTo(-(baseZSteps));
 
   while (ZAxis.distanceToGo() != 0) {
     ZAxis.run();
@@ -581,7 +584,8 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
-      long zSteps = -(stepsZ(baseZAngle));
+      long zSteps = -(baseZSteps);
+      Serial.println("[MOTOR] : Z-STEPS: "); Serial.print(zSteps);
       addLeftRightInstruction(zSteps);
       // up plate hieght
       // move to right (-)  * 23
@@ -600,7 +604,8 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
-      long zSteps = -(stepsZ(baseZAngle * 2));
+      long zSteps = -(baseZSteps * 2);
+      Serial.println("[MOTOR] : Z-STEPS: "); Serial.print(zSteps);
       addLeftRightInstruction(zSteps);
       // up plate hieght
       // move to right (-)  * 23 * 2
@@ -619,7 +624,8 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
-      long zSteps = stepsZ(baseZAngle);
+      long zSteps = baseZSteps;
+      Serial.println("[MOTOR] : Z-STEPS: "); Serial.print(zSteps);
       addLeftRightInstruction(zSteps);
       // up plate hieght
       // move to left  * 23
@@ -638,7 +644,8 @@ void subMoveStepCommon(int fromTower, int toTower, int carryPlate) {
       double toTowerX = baseX;
       addUpAndDownInstruction(toTowerX, highestTowerY);
 
-      long zSteps = stepsZ(baseZAngle * 2);
+      long zSteps = baseZSteps * 2;
+      Serial.println("[MOTOR] : Z-STEPS: "); Serial.print(zSteps);
       addLeftRightInstruction(zSteps);
       // up plate hieght
       // move to left  * 23 * 2
