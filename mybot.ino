@@ -193,7 +193,7 @@ void setup() {
   drawDisplay();
 
   baseZSteps = stepsZ(baseZAngle);
-  
+
   pinMode(BUZZER_DIO, OUTPUT);
   pinMode(BUTTON_DIO, INPUT);
   digitalWrite(BUTTON_DIO, HIGH);
@@ -501,7 +501,7 @@ void gotoInitZPosition(void) {
 
   ZAxis.moveTo(-21400);
 
-  while (ZAxis.distanceToGo() != 0) { 
+  while (ZAxis.distanceToGo() != 0) {
     ZAxis.run();
   }
 
@@ -686,42 +686,49 @@ void loop () {
   //      Serial.print(" intermediateTower >>>> ");
   //      Serial.print(intermediateTower);
 
-  if (isPlatesReady && (currentMove < numberOfMoves)) {
+  if (isPlatesReady) {
     if (isReadyForNextMove) {
       currentMove++;
-
-      Serial.println(" ");
-      Serial.print("[MOTOR] : Current Move: "); Serial.print(currentMove);
-
-      int fromTower = movesArray[currentMove][1];
-      int toTower = movesArray[currentMove][2];
-
-      //      Serial.println(" ");
-      //      Serial.print("[MOTOR] : currentTower 1: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
-
-      //      if (currentMove > 0) {
-      //        currentTower = movesArray[currentMove - 1][2];
-      //      }
-
-      if (currentTower == fromTower) {
-        Serial.println(" ");
-        Serial.print("[MOTOR] : currentTower 2: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
-        subMoveStep_2(fromTower, toTower);
-        currentTower = toTower;
-      } else {
-        Serial.println(" ");
-        Serial.print("[MOTOR] : currentTower 3: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
-        subMoveStepCommon(currentTower, fromTower, 0);
-        currentTower = fromTower;
+      if (currentMove < numberOfMoves) {
 
         Serial.println(" ");
-        Serial.print("[MOTOR] : currentTower 4: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
-        subMoveStep_2(fromTower, toTower);
-        currentTower = toTower;
+        Serial.print("[MOTOR] : Current Move: "); Serial.print(currentMove);
+
+        int fromTower = movesArray[currentMove][1];
+        int toTower = movesArray[currentMove][2];
+
+        Serial.println(" ");
+        Serial.print("[MOTOR] : currentTower >>>> : "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
+        Serial.print("[MOTOR] : Current Move: "); Serial.print(currentMove);
+
+
+        //      if (currentMove > 0) {
+        //        currentTower = movesArray[currentMove - 1][2];
+        //      }
+
+        if (currentTower == fromTower) {
+          Serial.println(" ");
+          Serial.print("[MOTOR] : currentTower 2: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
+          subMoveStep_2(fromTower, toTower);
+          currentTower = toTower;
+        } else {
+          Serial.println(" ");
+          Serial.print("[MOTOR] : currentTower 3: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
+          subMoveStepCommon(currentTower, fromTower, 0);
+          currentTower = fromTower;
+
+          Serial.println(" ");
+          Serial.print("[MOTOR] : currentTower 4: "); Serial.print(currentTower); Serial.print(" fromTower: "); Serial.print(fromTower); Serial.print(" toTower: "); Serial.print(toTower);
+          subMoveStep_2(fromTower, toTower);
+          currentTower = toTower;
+        }
+
+        currentTowerStatus[fromTower]--;
+        currentTowerStatus[toTower]++;
+
+      }else{
+        Serial.println(" <<<<<<<<<<<<<<< THIS IS THE LAST MOVE >>>>>>>>>>>>>>");       
       }
-
-      currentTowerStatus[fromTower]--;
-      currentTowerStatus[toTower]++;
 
       isReadyForNextMove = false;
     }
@@ -760,8 +767,21 @@ void loop () {
         Serial.println(" ");
         Serial.print("INSTRUCTION TYPE "); Serial.print(currentInstructionType);
       }
-    } else {
+    } else if (currentMove < numberOfMoves){
       isReadyForNextMove = true;
+    }else if(isCurrentInstructionComplete && (currentMove == numberOfMoves)){
+      Serial.println(" <<<<<<<<<<<<<<< All done >>>>>>>>>>>>>>");
+      isPlatesReady = false;
+      numberOfMoves = 0;
+      currentMove = -1; 
+      currentTowerStatus[0] = 0;     
+      currentTowerStatus[1] = 0;
+      currentTowerStatus[2] = 0;
+      currentTower = 0;
+      currentInstructionType = 0;
+
+      isReadyForNextMove = true;
+      isCurrentInstructionComplete = true;
     }
 
     if (YAxis.distanceToGo() != 0) {
@@ -818,12 +838,12 @@ void loop () {
 void hanoiNoOfMoves(void) {
   numberOfMoves = (round(pow(2, numberOfPlates))) - 1;
 
-//  Serial.println("Hanoi plates :- ");
-//  Serial.print(numberOfPlates);
-//  Serial.print(" Number Of Moves :- ");
-//  Serial.print(numberOfMoves);
-//  Serial.print(" Pow function :- ");
-//  Serial.print(pow(2, numberOfPlates));
+  //  Serial.println("Hanoi plates :- ");
+  //  Serial.print(numberOfPlates);
+  //  Serial.print(" Number Of Moves :- ");
+  //  Serial.print(numberOfMoves);
+  //  Serial.print(" Pow function :- ");
+  //  Serial.print(pow(2, numberOfPlates));
 
   if (movesArray != NULL) {
     movesArray = (int**) realloc(movesArray, numberOfMoves * sizeof(int));
@@ -836,12 +856,12 @@ void hanoiNoOfMoves(void) {
     movesArray[iRow] = (int *) malloc(3 * sizeof(int));
   }
 
-//  Serial.println("Hanoi plates :- ");
-//  Serial.print(numberOfPlates);
-//  Serial.print(" Number Of Moves :- ");
-//  Serial.print(numberOfMoves);
-//  Serial.print(" Pow function :- ");
-//  Serial.print(pow(2, numberOfPlates));
+  //  Serial.println("Hanoi plates :- ");
+  //  Serial.print(numberOfPlates);
+  //  Serial.print(" Number Of Moves :- ");
+  //  Serial.print(numberOfMoves);
+  //  Serial.print(" Pow function :- ");
+  //  Serial.print(pow(2, numberOfPlates));
 
 
   currentMove = -1;
