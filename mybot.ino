@@ -56,7 +56,7 @@ static const int  FORE_ARM_LENGTH  =  240;
 static const long MICRO_STEPS_PER_ROUND = 6400;
 static const long X_MOTOR_STEPS = 89600;
 static const long Y_MOTOR_STEPS = 121600;
-static const double Z_MOTOR_STEPS = 51109.33;
+static const double Z_MOTOR_STEPS = 48000;
 
 static const double X_INIT_ANGLE = 24.1;
 static const double Y_INIT_ANGLE = 13.05 ;
@@ -506,7 +506,7 @@ void gotoInitZPosition(void) {
   //
   //  ZAxis.setCurrentPosition(0);
 
-  ZAxis.moveTo(-21400);
+  ZAxis.moveTo(-20000);
 
   while (ZAxis.distanceToGo() != 0) {
     ZAxis.run();
